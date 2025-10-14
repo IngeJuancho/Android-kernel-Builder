@@ -77,7 +77,7 @@ jobs:
 
       - name: ✏️ Apply Kernel-Specific Fix
         working-directory: ${{ env.KERNEL_NAME }}
-        run: echo "CONFIG_SCHED_TRACER=n" >> ${{ env.KERNEL_DEFCONFIG_PATH }}
+        run: echo "CONFIG_SCHED_TRACER=n" >> arch/arm64/configs/vayu_defconfig
 
       - name: 💫 Get toolchains
         env:
@@ -130,7 +130,7 @@ jobs:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         run: |
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s
-          echo -e "CONFIG_KPROBES=y\nCONFIG_HAVE_KPROBES=y\nCONFIG_KPROBE_EVENTS=y" >> ${{ env.KERNEL_DEFCONFIG_PATH }}
+          echo -e "CONFIG_KPROBES=y\nCONFIG_HAVE_KPROBES=y\nCONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/vayu_defconfig
       - name: 👍 Start building the kernel
         working-directory: ${{ env.KERNEL_NAME }}
         env:
@@ -138,15 +138,19 @@ jobs:
         run: |
           export KBUILD_BUILD_HOST=Github-Action
           export KBUILD_BUILD_USER=${{ github.actor }}
-          export KBUILD_DEFCONFIG=${{ env.WORKSPACE }}/${{ env.KERNEL_NAME }}/${{ env.KERNEL_DEFCONFIG_PATH }}
-          make ${{ env.ARGS }} defconfig
+          make ${{ env.ARGS }} ${{ env.KERNEL_DEFCONFIG_PATH }}
           make ${{ env.ARGS }}
-      - name: 💛 Upload artifact
+      - name: 📦 Pack All Boot Files
+        if: success()
+        run: |
+          cd ${{ env.OUT_DIR }}/arch/arm64/boot/
+          zip -r9 boot-files.zip .
+      - name: 📤 Upload All Boot Files
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-Kernel
-          path: ${{ env.OUT_DIR }}/arch/${{ steps.generate-args.outputs.ARCH }}/boot/Image.gz-dtb
-          if-no-files-found: ignore
+          name: "${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-Boot-Files"
+          path: "${{ env.OUT_DIR }}/arch/arm64/boot/boot-files.zip"
       - name: ⏰ Pack Anykernel3
         if: env.USE_ANYKERNEL3 == 'true'
         env:
