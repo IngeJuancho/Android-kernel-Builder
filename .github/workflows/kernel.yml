@@ -105,7 +105,12 @@ jobs:
             if echo $toolchain | jq -e 'has("url")' > /dev/null; then
               toolchain_url=$(echo $toolchain | jq -r ".url")
               mkdir -p "$toolchain_name"
-              wget -qO- "$toolchain_url" | tar -xz -C "$toolchain_name"
+              # Descargar primero a un archivo temporal
+              wget -q "$toolchain_url" -O toolchain.tar.gz
+              # Descomprimir después desde el archivo
+              tar -xzf toolchain.tar.gz -C "$toolchain_name"
+              # Limpiar
+              rm toolchain.tar.gz
             else
               toolchain_repo=$(echo $toolchain | jq -r ".repo")
               toolchain_branch=$(echo $toolchain | jq -r ".branch")
