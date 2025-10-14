@@ -11,7 +11,7 @@ on:
 jobs:
   Read-configuration:
     name: 🐂 Parse *.config.json
-    runs-on: ubuntu-22.04 # <-- Cambio importante
+    runs-on: ubuntu-22.04
     outputs:
       CONFIGS: ${{ steps.generate-matrix.outputs.CONFIGS }}
       BUILD_DATE: ${{ steps.generate-builddate.outputs.BUILDDATE }}
@@ -32,7 +32,7 @@ jobs:
 
   Build-Kernel:
     name: "🐎 Build kernel"
-    runs-on: ubuntu-22.04 # <-- Cambio importante
+    runs-on: ubuntu-22.04
     needs:
       - Read-configuration
     strategy:
@@ -122,7 +122,7 @@ jobs:
         id: generate-args
         env:
           PARAMS: "${{ toJSON(matrix.CONFIG.params) }}"
-          THREAD: $(nproc --all)
+          THREAD: 2 # <-- Cambio importante: Reducido para ahorrar RAM
         run: |
           ARCH=$(echo $PARAMS | jq -r ".ARCH")
           CC=$(echo $PARAMS | jq -r ".CC")
