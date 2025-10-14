@@ -10,23 +10,19 @@ on:
 
 jobs:
   Read-configuration:
-    name: 🐂 Parse *.config.json
     runs-on: ubuntu-22.04
     outputs:
       CONFIGS: ${{ steps.generate-matrix.outputs.CONFIGS }}
       BUILD_DATE: ${{ steps.generate-builddate.outputs.BUILDDATE }}
     steps:
-      - name: 😄 Checkout
-        uses: actions/checkout@v4
-
-      - name: 😆 Generate Matrix
+      - uses: actions/checkout@v4
+      - name: Generate Matrix
         id: generate-matrix
         run: |
           echo "CONFIGS<<EOF" >> $GITHUB_OUTPUT
           jq -s '[.[][]]' Kernel/configs/*.config.json >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: ⏰ Set builddate
+      - name: Set builddate
         id: generate-builddate
         run: echo "BUILDDATE=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
@@ -46,41 +42,33 @@ jobs:
       KERNEL_NAME: ${{ matrix.CONFIG.kernelSource.name }}
       KERNEL_REPO: ${{ matrix.CONFIG.kernelSource.repo }}
       KERNEL_BRANCH: ${{ matrix.CONFIG.kernelSource.branch }}
-      KERNEL_DEVICE: ${{ matrix.CONFIG.kernelSource.device }}
       KERNEL_DEFCONFIG_PATH: ${{ matrix.CONFIG.kernelSource.defconfig }}
       ENABLE_CCACHE: ${{ matrix.CONFIG.enableCcache }}
       USE_ANYKERNEL3: ${{ matrix.CONFIG.AnyKernel3.use }}
       CONFIRM_RELEASE: ${{ matrix.CONFIG.AnyKernel3.release }}
       ENABLE_KERNELSU: ${{ matrix.CONFIG.enableKernelSU }}
-      ENABLE_LXC: ${{ matrix.CONFIG.enableLXC }}
       OUT_DIR: "${{ github.workspace }}/out"
       CCACHE_DIR: "${{ github.workspace }}/ccache"
     steps:
-      - name: 📐 Set swap to 10G
-        uses: pierotofy/set-swap-space@master
+      - uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 10
-
-      - name: 😄 Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: ⭐ Install prerequisites
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential bc ccache curl flex git jq libelf-dev \
             libssl-dev unzip zip zlib1g-dev bison
-
       - name: 🚄 Setup ccache
-        if: ${{ env.ENABLE_CCACHE == 'true' }}
+        if: env.ENABLE_CCACHE == 'true'
         id: hash
         run: |
           mkdir -p ${{ env.OUT_DIR }}
           ccache -o compression=false -o cache_dir=${{ env.CCACHE_DIR }}
           echo "HASH=$(echo -n '${{ toJSON(matrix.config) }}' | openssl dgst -sha1 | awk '{print $2}')" >> $GITHUB_OUTPUT
-
       - name: 🚅 Cache ccache & output
-        if: ${{ env.ENABLE_CCACHE == 'true' }}
+        if: env.ENABLE_CCACHE == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -89,10 +77,12 @@ jobs:
           key: cache-${{ env.KERNEL_NAME }}-${{ steps.hash.outputs.HASH }}-${{ env.BUILD_DATE }}
           restore-keys: |
             cache-${{ env.KERNEL_NAME }}-${{ steps.hash.outputs.HASH }}-
-
-      - name: 🌟 Clone kernel source => (${{ env.KERNEL_REPO }})
-        run: |
-          git clone --depth=1 --branch ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }}
+      - name: 🌟 Clone kernel source
+        run: git clone --depth=1 --branch ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }}
+      
+      - name: ✏️ Fix Case-Sensitivity Issue
+        working-directory: ${{ env.KERNEL_NAME }}
+        run: mv drivers/Kernelsu drivers/kernelsu
 
       - name: 💫 Get toolchains
         env:
@@ -117,12 +107,11 @@ jobs:
               echo "${{ env.WORKSPACE }}/$toolchain_name/$subPath" >> $GITHUB_PATH
             done
           done
-
       - name: 😎 Set build args
         id: generate-args
         env:
           PARAMS: "${{ toJSON(matrix.CONFIG.params) }}"
-          THREAD: 2 # <-- Cambio importante: Reducido para ahorrar RAM
+          THREAD: 2
         run: |
           ARCH=$(echo $PARAMS | jq -r ".ARCH")
           CC=$(echo $PARAMS | jq -r ".CC")
@@ -139,16 +128,16 @@ jobs:
           done < <(jq -r '.externalCommands | to_entries[] | "\(.key)=\(.value)"' <<< "$PARAMS")
           echo "ARCH=$ARCH" >> $GITHUB_OUTPUT
           echo "ARGS=$args" >> $GITHUB_OUTPUT
-
       - name: 😋 Setup KernelSU
-        if: ${{ env.ENABLE_KERNELSU == 'true' }}
+        if: env.ENABLE_KERNELSU == 'true'
         working-directory: ${{ env.KERNEL_NAME }}
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         run: |
+          # Este paso ahora es redundante si la rama ya tiene KSU, pero lo dejamos por si acaso
+          # El script es suficientemente inteligente para no volver a aplicar parches si ya existen.
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s
           echo -e "CONFIG_KPROBES=y\nCONFIG_HAVE_KPROBES=y\nCONFIG_KPROBE_EVENTS=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
-      
       - name: 👍 Start building the kernel
         working-directory: ${{ env.KERNEL_NAME }}
         env:
@@ -158,16 +147,14 @@ jobs:
           export KBUILD_BUILD_USER=${{ github.actor }}
           make ${{ env.ARGS }} ${{ env.KERNEL_DEFCONFIG_PATH }}
           make ${{ env.ARGS }}
-
       - name: 💛 Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-Kernel
           path: ${{ env.OUT_DIR }}/arch/${{ steps.generate-args.outputs.ARCH }}/boot/Image.gz-dtb
           if-no-files-found: ignore
-
       - name: ⏰ Pack Anykernel3
-        if: ${{ env.USE_ANYKERNEL3 == 'true' }}
+        if: env.USE_ANYKERNEL3 == 'true'
         env:
           ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}"
         run: |
@@ -175,16 +162,14 @@ jobs:
           cp -f ${{ env.OUT_DIR }}/arch/${{ steps.generate-args.outputs.ARCH }}/boot/Image.gz-dtb ./AnyKernel3/
           cd AnyKernel3/
           zip -r9 "${{ env.ANYKERNEL3_FILE }}.zip" ./*
-
       - name: "💾 Upload AnyKernel3 zip"
         uses: actions/upload-artifact@v4
-        if: ${{ env.USE_ANYKERNEL3 == 'true' }}
+        if: env.USE_ANYKERNEL3 == 'true'
         with:
           name: "${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-AnyKernel3"
           path: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}.zip"
-
       - name: 🧧 Create GitHub Release
-        if: ${{ env.USE_ANYKERNEL3 == 'true' && env.CONFIRM_RELEASE == 'true' }}
+        if: env.USE_ANYKERNEL3 == 'true' && env.CONFIRM_RELEASE == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.BUILD_DATE }}.${{ github.run_number }}
