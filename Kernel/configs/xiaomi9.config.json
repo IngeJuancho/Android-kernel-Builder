@@ -1,18 +1,17 @@
 [
   {
     "kernelSource": {
-      "name": "Xiaomi9KernelPoweredBySeparate",
-      "repo": "https://github.com/Separatee/AllinOneKernel",
-      "branch": "main",
-      "device": "cepheus",
-      "defconfig": "cepheus_defconfig"
+      "name": "AnymoreVayu",
+      "repo": "https://github.com/AnymoreProject/android_kernel_vayu",
+      "branch": "16-ksu", // Puedes cambiarlo a "16", "16-miui", etc.
+      "device": "vayu",
+      "defconfig": "vayu_defconfig"
     },
     "toolchains": [
       {
-        "name": "proton-clang",
-        "repo": "https://github.com/kdrag0n/proton-clang",
-        "branch": "master",
-        "binaryEnv": ["./bin"]
+        "name": "aosp-clang",
+        "url": "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r510928.tar.gz",
+        "binaryEnv": ["bin"]
       }
     ],
     "enableCcache": true,
@@ -20,16 +19,16 @@
       "ARCH": "arm64",
       "CC": "clang",
       "externalCommands": {
-        "CROSS_COMPILE": "proton-clang/bin/aarch64-linux-gnu-",
-        "CROSS_COMPILE_ARM32": "proton-clang/bin/arm-linux-gnueabi-",
+        "CROSS_COMPILE": "aarch64-linux-gnu-",
+        "CROSS_COMPILE_ARM32": "arm-linux-gnueabi-",
         "CLANG_TRIPLE": "aarch64-linux-gnu-"
       }
     },
     "AnyKernel3": {
-      "use": false,
-      "release": true
+      "use": true,      // Crea el zip flasheable
+      "release": false  // No crea un "Release" en GitHub automáticamente
     },
-    "enableKernelSU": false,
+    "enableKernelSU": true, // Activa el parcheo de KernelSU
     "enableLXC": false
   }
 ]
