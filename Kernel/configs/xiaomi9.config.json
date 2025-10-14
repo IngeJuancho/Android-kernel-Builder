@@ -3,7 +3,7 @@
     "kernelSource": {
       "name": "AnymoreVayu",
       "repo": "https://github.com/AnymoreProject/android_kernel_vayu",
-      "branch": "16-ksu", // Puedes cambiarlo a "16", "16-miui", etc.
+      "branch": "16-ksu",
       "device": "vayu",
       "defconfig": "vayu_defconfig"
     },
@@ -25,10 +25,10 @@
       }
     },
     "AnyKernel3": {
-      "use": true,      // Crea el zip flasheable
-      "release": false  // No crea un "Release" en GitHub automáticamente
+      "use": true,
+      "release": false
     },
-    "enableKernelSU": true, // Activa el parcheo de KernelSU
+    "enableKernelSU": true,
     "enableLXC": false
   }
 ]
