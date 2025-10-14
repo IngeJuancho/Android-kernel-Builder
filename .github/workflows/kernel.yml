@@ -11,7 +11,7 @@ on:
 jobs:
   Read-configuration:
     name: 🐂 Parse *.config.json
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # <-- Cambio importante
     outputs:
       CONFIGS: ${{ steps.generate-matrix.outputs.CONFIGS }}
       BUILD_DATE: ${{ steps.generate-builddate.outputs.BUILDDATE }}
@@ -32,7 +32,7 @@ jobs:
 
   Build-Kernel:
     name: "🐎 Build kernel"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # <-- Cambio importante
     needs:
       - Read-configuration
     strategy:
@@ -105,11 +105,8 @@ jobs:
             if echo $toolchain | jq -e 'has("url")' > /dev/null; then
               toolchain_url=$(echo $toolchain | jq -r ".url")
               mkdir -p "$toolchain_name"
-              # Descargar primero a un archivo temporal
               wget -q "$toolchain_url" -O toolchain.tar.gz
-              # Descomprimir después desde el archivo
               tar -xzf toolchain.tar.gz -C "$toolchain_name"
-              # Limpiar
               rm toolchain.tar.gz
             else
               toolchain_repo=$(echo $toolchain | jq -r ".repo")
