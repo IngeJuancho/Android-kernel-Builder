@@ -33,10 +33,7 @@
         "STRIP": "llvm-strip"
       }
     },
-    "AnyKernel3": {
-      "use": true,
-      "release": false
-    },
+    "AnyKernel3": { "use": true, "release": false },
     "enableKernelSU": false,
     "enableLXC": false
   }
