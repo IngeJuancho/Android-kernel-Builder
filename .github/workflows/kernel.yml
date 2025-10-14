@@ -79,11 +79,6 @@ jobs:
             cache-${{ env.KERNEL_NAME }}-${{ steps.hash.outputs.HASH }}-
       - name: 🌟 Clone kernel source
         run: git clone --depth=1 --branch ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }}
-      
-      - name: ✏️ Fix Case-Sensitivity Issue
-        working-directory: ${{ env.KERNEL_NAME }}
-        run: mv drivers/Kernelsu drivers/kernelsu
-
       - name: 💫 Get toolchains
         env:
           toolchains: "${{ toJSON(matrix.CONFIG.toolchains) }}"
@@ -134,8 +129,6 @@ jobs:
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         run: |
-          # Este paso ahora es redundante si la rama ya tiene KSU, pero lo dejamos por si acaso
-          # El script es suficientemente inteligente para no volver a aplicar parches si ya existen.
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s
           echo -e "CONFIG_KPROBES=y\nCONFIG_HAVE_KPROBES=y\nCONFIG_KPROBE_EVENTS=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
       - name: 👍 Start building the kernel
