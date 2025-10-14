@@ -146,21 +146,34 @@ jobs:
           name: ${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-Kernel
           path: ${{ env.OUT_DIR }}/arch/${{ steps.generate-args.outputs.ARCH }}/boot/Image.gz-dtb
           if-no-files-found: ignore
+
       - name: ⏰ Pack Anykernel3
         if: env.USE_ANYKERNEL3 == 'true'
         env:
           ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}"
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          cp -f ${{ env.OUT_DIR }}/arch/${{ steps.generate-args.outputs.ARCH }}/boot/Image.gz-dtb ./AnyKernel3/
+          # Lógica mejorada para encontrar el kernel compilado
+          if [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz-dtb" ]; then
+            cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz-dtb" ./AnyKernel3/
+          elif [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz" ]; then
+            cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz" ./AnyKernel3/
+          elif [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image" ]; then
+            cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image" ./AnyKernel3/
+          else
+            echo "¡No se encontró la imagen del kernel compilado!"
+            exit 1
+          fi
           cd AnyKernel3/
           zip -r9 "${{ env.ANYKERNEL3_FILE }}.zip" ./*
+
       - name: "💾 Upload AnyKernel3 zip"
         uses: actions/upload-artifact@v4
         if: env.USE_ANYKERNEL3 == 'true'
         with:
           name: "${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}-AnyKernel3"
           path: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}.zip"
+
       - name: 🧧 Create GitHub Release
         if: env.USE_ANYKERNEL3 == 'true' && env.CONFIRM_RELEASE == 'true'
         uses: softprops/action-gh-release@v2
