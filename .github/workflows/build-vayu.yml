@@ -6,214 +6,118 @@ on:
       kernel_branch:
         description: 'Kernel branch'
         required: true
-        default: 'lineage-20'
+        default: 'lineage-21'
         type: choice
         options:
           - lineage-20
           - lineage-21
+          - lineage-22
           - main
       
       compiler:
-        description: 'Compiler to use'
+        description: 'Compiler'
         required: true
         default: 'proton-clang'
         type: choice
         options:
           - proton-clang
           - aosp-clang
-          
-      clean_build:
-        description: 'Clean build'
-        required: true
-        default: true
-        type: boolean
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     
     steps:
-    - name: Maximize Build Space
-      uses: easimon/maximize-build-space@master
-      with:
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        
     - name: Checkout
       uses: actions/checkout@v4
       
+    - name: Free Disk Space
+      run: |
+        echo "🧹 Liberando espacio..."
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        df -h
+        
     - name: Setup Build Environment
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          bc bison build-essential ccache curl flex \
-          g++-multilib gcc-multilib git gnupg gperf \
-          imagemagick lib32ncurses5-dev lib32readline-dev \
-          lib32z1-dev liblz4-tool libncurses5 libncurses5-dev \
-          libsdl1.2-dev libssl-dev libxml2 libxml2-utils \
-          lzop pngcrush rsync schedtool squashfs-tools \
-          xsltproc zip zlib1g-dev
+        echo "📦 Instalando dependencias..."
+        sudo apt-get update -qq
+        
+        sudo apt-get install -y --no-install-recommends \
+          bc \
+          bison \
+          build-essential \
+          ca-certificates \
+          ccache \
+          curl \
+          flex \
+          git \
+          libelf-dev \
+          libssl-dev \
+          python3 \
+          wget \
+          zip \
+          zlib1g-dev
+        
+        echo "✅ Entorno listo!"
         
     - name: Setup ccache
-      uses: hendrikmuhs/ccache-action@v1.2
-      with:
-        max-size: 8G
-        key: vayu-kernel-${{ inputs.kernel_branch }}
+      run: |
+        echo "⚡ Configurando ccache..."
+        mkdir -p ~/.ccache
+        echo "max_size = 5G" > ~/.ccache/ccache.conf
+        echo "compression = true" >> ~/.ccache/ccache.conf
+        ccache -s
         
     - name: Clone Kernel Source
       run: |
+        echo "📥 Clonando kernel de Vayu..."
         git clone --depth=1 \
           https://github.com/AnymoreProject/android_kernel_vayu \
           -b ${{ inputs.kernel_branch }} kernel
         
-    - name: Get Kernel Info
-      id: kernel-info
+        cd kernel
+        echo "✅ Kernel clonado: $(git log -1 --oneline)"
+        
+    - name: Get Kernel Version
+      id: version
       run: |
         cd kernel
-        echo "version=$(make kernelversion)" >> $GITHUB_OUTPUT
-        echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        VERSION=$(make kernelversion 2>/dev/null || echo "unknown")
+        COMMIT=$(git rev-parse --short HEAD)
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "commit=${COMMIT}" >> $GITHUB_OUTPUT
+        echo "📋 Versión: ${VERSION} (${COMMIT})"
         
     - name: Clone Proton Clang
       if: inputs.compiler == 'proton-clang'
       run: |
+        echo "🔨 Descargando Proton Clang..."
         mkdir -p toolchain
         cd toolchain
-        wget -q https://github.com/kdrag0n/proton-clang/archive/refs/heads/master.zip
-        unzip -q master.zip
-        mv proton-clang-master clang
+        
+        # Descargar última versión
+        git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
+        
+        echo "✅ Compilador listo: $(clang/bin/clang --version | head -n1)"
         
     - name: Clone AOSP Clang
       if: inputs.compiler == 'aosp-clang'
       run: |
-        mkdir -p toolchain
+        echo "🔨 Descargando AOSP Clang..."
+        mkdir -p toolchain/clang
         cd toolchain
+        
+        # Usar versión estable
         wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r487747c.tar.gz
-        mkdir clang
         tar -xzf clang-r487747c.tar.gz -C clang
+        rm clang-r487747c.tar.gz
         
-    - name: Build Kernel
+        echo "✅ AOSP Clang listo"
+        
+    - name: Verify Defconfig
       run: |
+        echo "🔍 Verificando defconfig..."
         cd kernel
-        export PATH="$GITHUB_WORKSPACE/toolchain/clang/bin:$PATH"
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export KBUILD_BUILD_USER=GitHub
-        export KBUILD_BUILD_HOST=Actions
-        
-        # Clean if requested
-        if [ "${{ inputs.clean_build }}" == "true" ]; then
-          make mrproper
-        fi
-        
-        # Configure
-        make O=out ARCH=arm64 vayu_defconfig
-        
-        # Build
-        make -j$(nproc) O=out \
-          ARCH=arm64 \
-          CC="ccache clang" \
-          CLANG_TRIPLE=aarch64-linux-gnu- \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-          Image.gz-dtb dtbo.img
-          
-    - name: Check Build Output
-      run: |
-        if [ ! -f kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
-          echo "❌ Image.gz-dtb not found!"
-          exit 1
-        fi
-        echo "✅ Kernel built successfully!"
-        ls -lh kernel/out/arch/arm64/boot/
-        
-    - name: Clone AnyKernel3
-      run: |
-        git clone --depth=1 https://github.com/osm0sis/AnyKernel3 anykernel
-        
-    - name: Configure AnyKernel3
-      run: |
-        cd anykernel
-        # Configuración para Vayu
-        cat > anykernel.sh << 'EOF'
-        # AnyKernel3 Ramdisk Mod Script
-        # osm0sis @ xda-developers
-        
-        properties() { '
-        kernel.string=Vayu Kernel by ${{ github.actor }}
-        do.devicecheck=1
-        do.modules=0
-        do.systemless=1
-        do.cleanup=1
-        do.cleanuponabort=0
-        device.name1=vayu
-        device.name2=bhima
-        supported.versions=11-14
-        supported.patchlevels=
-        '; }
-        
-        block=/dev/block/bootdevice/by-name/boot;
-        is_slot_device=0;
-        ramdisk_compression=auto;
-        patch_vbmeta_flag=auto;
-        
-        . tools/ak3-core.sh;
-        
-        dump_boot;
-        write_boot;
-        EOF
-        
-    - name: Package Kernel
-      run: |
-        cp kernel/out/arch/arm64/boot/Image.gz-dtb anykernel/
-        if [ -f kernel/out/arch/arm64/boot/dtbo.img ]; then
-          cp kernel/out/arch/arm64/boot/dtbo.img anykernel/
-        fi
-        
-        cd anykernel
-        DATE=$(date +%Y%m%d)
-        ZIP_NAME="AnyKernel3-Vayu-${{ steps.kernel-info.outputs.version }}-${DATE}.zip"
-        zip -r9 "../${ZIP_NAME}" * -x .git README.md *placeholder
-        
-        cd ..
-        echo "zip_name=${ZIP_NAME}" >> $GITHUB_ENV
-        echo "✅ Package created: ${ZIP_NAME}"
-        
-    - name: Upload Kernel
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.zip_name }}
-        path: ${{ env.zip_name }}
-        compression-level: 0
-        
-    - name: Create Release
-      if: github.ref == 'refs/heads/main'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ steps.kernel-info.outputs.version }}-${{ github.run_number }}
-        name: Vayu Kernel ${{ steps.kernel-info.outputs.version }}
-        body: |
-          ## Vayu Kernel Build
-          
-          **Kernel Version:** ${{ steps.kernel-info.outputs.version }}
-          **Branch:** ${{ inputs.kernel_branch }}
-          **Compiler:** ${{ inputs.compiler }}
-          **Commit:** ${{ steps.kernel-info.outputs.commit }}
-          **Build Date:** $(date)
-          
-          ### Changelog
-          - Compiled from AnymoreProject/android_kernel_vayu
-          - Branch: ${{ inputs.kernel_branch }}
-          
-          ### Installation
-          1. Download the AnyKernel3 ZIP
-          2. Boot to TWRP/OrangeFox
-          3. Flash the ZIP
-          4. Reboot and enjoy!
-          
-        files: ${{ env.zip_name }}
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
