@@ -10,7 +10,7 @@
     "toolchains": [
       {
         "name": "aosp-clang",
-        "url": "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r510928.tar.gz",
+        "url": "https://github.com/AOSP-Clang/Main-Clang/releases/download/17.0.2-r498229b/17.0.2-r498229b.tar.gz",
         "binaryEnv": ["bin"]
       }
     ],
