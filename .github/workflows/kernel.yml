@@ -74,6 +74,11 @@ jobs:
             cache-${{ env.KERNEL_NAME }}-${{ steps.hash.outputs.HASH }}-
       - name: 🌟 Clone kernel source
         run: git clone --depth=1 --branch ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_REPO }} "${{ env.KERNEL_NAME }}"
+
+      - name: ✏️ Apply Kernel-Specific Fix
+        working-directory: ${{ env.KERNEL_NAME }}
+        run: echo "CONFIG_SCHED_TRACER=n" >> ${{ env.KERNEL_DEFCONFIG_PATH }}
+
       - name: 💫 Get toolchains
         env:
           toolchains: "${{ toJSON(matrix.CONFIG.toolchains) }}"
@@ -125,7 +130,7 @@ jobs:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         run: |
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s
-          echo -e "CONFIG_KPROBES=y\nCONFIG_HAVE_KPROBES=y\nCONFIG_KPROBE_EVENTS=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_DEFCONFIG_PATH }}
+          echo -e "CONFIG_KPROBES=y\nCONFIG_HAVE_KPROBES=y\nCONFIG_KPROBE_EVENTS=y" >> ${{ env.KERNEL_DEFCONFIG_PATH }}
       - name: 👍 Start building the kernel
         working-directory: ${{ env.KERNEL_NAME }}
         env:
