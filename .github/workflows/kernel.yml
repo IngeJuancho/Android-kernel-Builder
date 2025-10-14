@@ -75,10 +75,6 @@ jobs:
       - name: 🌟 Clone kernel source
         run: git clone --depth=1 --branch ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_REPO }} "${{ env.KERNEL_NAME }}"
 
-      - name: ✏️ Apply Kernel-Specific Fix
-        working-directory: ${{ env.KERNEL_NAME }}
-        run: echo "CONFIG_SCHED_TRACER=n" >> arch/arm64/configs/vayu_defconfig
-
       - name: 💫 Get toolchains
         env:
           toolchains: "${{ toJSON(matrix.CONFIG.toolchains) }}"
@@ -131,6 +127,7 @@ jobs:
         run: |
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s
           echo -e "CONFIG_KPROBES=y\nCONFIG_HAVE_KPROBES=y\nCONFIG_KPROBE_EVENTS=y" >> arch/arm64/configs/vayu_defconfig
+          
       - name: 👍 Start building the kernel
         working-directory: ${{ env.KERNEL_NAME }}
         env:
@@ -138,8 +135,16 @@ jobs:
         run: |
           export KBUILD_BUILD_HOST=Github-Action
           export KBUILD_BUILD_USER=${{ github.actor }}
+          
+          # Generar la configuración inicial
           make ${{ env.ARGS }} ${{ env.KERNEL_DEFCONFIG_PATH }}
+          
+          # Forzar el valor de NR_CPUS a 8 para arreglar el error de compilación
+          sed -i 's/CONFIG_NR_CPUS=.*/CONFIG_NR_CPUS=8/g' ${{ env.OUT_DIR }}/.config
+          
+          # Compilar el kernel con la configuración corregida
           make ${{ env.ARGS }}
+          
       - name: 📦 Pack All Boot Files
         if: success()
         run: |
