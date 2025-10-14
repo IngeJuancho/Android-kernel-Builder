@@ -25,10 +25,7 @@ jobs:
     - name: Free Disk Space 🧹
       run: |
         echo "Liberando espacio..."
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /opt/ghc
-        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
         df -h
         
     - name: Setup Build Environment 📦
@@ -45,7 +42,6 @@ jobs:
         mkdir -p ~/.ccache
         echo "max_size = 5G" > ~/.ccache/ccache.conf
         echo "compression = true" >> ~/.ccache/ccache.conf
-        ccache -s
         
     - name: Clone Kernel Source 📥
       run: |
@@ -63,14 +59,14 @@ jobs:
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "commit=${COMMIT}" >> $GITHUB_OUTPUT
         
-    - name: Download Google Clang 21.0 🔨
+    - name: Download AOSP Clang (Official) 🔨
       run: |
-        echo "Descargando Google Clang 21.0 (recomendado por el desarrollador)..."
+        echo "Descargando el compilador oficial AOSP Clang..."
         mkdir -p toolchain
-        wget -q https://github.com/ZyCromer/Clang/releases/download/21.0.0/Clang-21.0.0-linux-x86_64.tar.gz
-        tar -xzf Clang-21.0.0-linux-x86_64.tar.gz -C toolchain
-        rm Clang-21.0.0-linux-x86_64.tar.gz
-        echo "Google Clang 21.0 listo."
+        wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r510928.tar.gz
+        tar -xzf clang-r510928.tar.gz -C toolchain
+        rm clang-r510928.tar.gz
+        echo "AOSP Clang listo."
         
     - name: Build Kernel 🚀
       run: |
