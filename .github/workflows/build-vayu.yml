@@ -11,7 +11,6 @@ on:
         options:
           - lineage-20
           - lineage-21
-          - lineage-22
           - main
       
       compiler:
@@ -31,93 +30,103 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Free Disk Space
+    - name: Free Disk Space 🧹
       run: |
-        echo "🧹 Liberando espacio..."
+        echo "Liberando espacio..."
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /opt/ghc
         sudo rm -rf /opt/hostedtoolcache/CodeQL
         df -h
         
-    - name: Setup Build Environment
+    - name: Setup Build Environment 📦
       run: |
-        echo "📦 Instalando dependencias..."
+        echo "Instalando dependencias..."
         sudo apt-get update -qq
-        
         sudo apt-get install -y --no-install-recommends \
-          bc \
-          bison \
-          build-essential \
-          ca-certificates \
-          ccache \
-          curl \
-          flex \
-          git \
-          libelf-dev \
-          libssl-dev \
-          python3 \
-          wget \
-          zip \
-          zlib1g-dev
+          bc bison build-essential ca-certificates ccache curl flex \
+          git libelf-dev libssl-dev python3 wget zip zlib1g-dev
+        echo "Entorno listo!"
         
-        echo "✅ Entorno listo!"
-        
-    - name: Setup ccache
+    - name: Setup ccache ⚡
       run: |
-        echo "⚡ Configurando ccache..."
+        echo "Configurando ccache..."
         mkdir -p ~/.ccache
         echo "max_size = 5G" > ~/.ccache/ccache.conf
         echo "compression = true" >> ~/.ccache/ccache.conf
         ccache -s
         
-    - name: Clone Kernel Source
+    - name: Clone Kernel Source 📥
       run: |
-        echo "📥 Clonando kernel de Vayu..."
+        echo "Clonando kernel de Vayu..."
         git clone --depth=1 \
           https://github.com/AnymoreProject/android_kernel_vayu \
           -b ${{ inputs.kernel_branch }} kernel
-        
         cd kernel
-        echo "✅ Kernel clonado: $(git log -1 --oneline)"
+        echo "Kernel clonado: $(git log -1 --oneline)"
         
-    - name: Get Kernel Version
+    - name: Get Kernel Version 📋
       id: version
       run: |
         cd kernel
-        VERSION=$(make kernelversion 2>/dev/null || echo "unknown")
+        VERSION=$(make kernelversion 2>/dev/null | cut -d'-' -f1)
         COMMIT=$(git rev-parse --short HEAD)
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "commit=${COMMIT}" >> $GITHUB_OUTPUT
-        echo "📋 Versión: ${VERSION} (${COMMIT})"
+        echo "Versión: ${VERSION} (${COMMIT})"
         
-    - name: Clone Proton Clang
+    - name: Clone Proton Clang 🔨
       if: inputs.compiler == 'proton-clang'
       run: |
-        echo "🔨 Descargando Proton Clang..."
-        mkdir -p toolchain
-        cd toolchain
+        echo "Descargando Proton Clang..."
+        git clone --depth=1 https://github.com/kdrag0n/proton-clang toolchain
+        echo "Compilador listo: $(toolchain/bin/clang --version | head -n1)"
         
-        # Descargar última versión
-        git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
-        
-        echo "✅ Compilador listo: $(clang/bin/clang --version | head -n1)"
-        
-    - name: Clone AOSP Clang
+    - name: Clone AOSP Clang 🔨
       if: inputs.compiler == 'aosp-clang'
       run: |
-        echo "🔨 Descargando AOSP Clang..."
-        mkdir -p toolchain/clang
-        cd toolchain
-        
-        # Usar versión estable
+        echo "Descargando AOSP Clang..."
+        mkdir -p toolchain
         wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r487747c.tar.gz
-        tar -xzf clang-r487747c.tar.gz -C clang
+        tar -xzf clang-r487747c.tar.gz -C toolchain
         rm clang-r487747c.tar.gz
+        echo "AOSP Clang listo"
         
-        echo "✅ AOSP Clang listo"
-        
-    - name: Verify Defconfig
+    - name: Build Kernel 🚀
       run: |
-        echo "🔍 Verificando defconfig..."
         cd kernel
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export KBUILD_BUILD_USER="GitHub"
+        export KBUILD_BUILD_HOST="Actions"
+        export PATH="$GITHUB_WORKSPACE/toolchain/bin:$PATH"
+        
+        # Configurar
+        make O=out vayu_defconfig
+        
+        # Compilar
+        make -j$(nproc --all) O=out \
+             CC=clang \
+             CROSS_COMPILE=aarch64-linux-gnu- \
+             LD=ld.lld
+        
+        # Verificar resultado
+        ls out/arch/arm64/boot/
+        
+    - name: Create Zip Package 📦
+      run: |
+        cd kernel/out/arch/arm64/boot
+        # El kernel compilado para este dispositivo es Image.gz
+        if [ -f "Image.gz" ]; then
+          mv Image.gz Image.gz-dtb
+          zip -r9 Vayu-Kernel-${{ inputs.kernel_branch }}-${{ steps.version.outputs.commit }}.zip Image.gz-dtb
+        else
+          echo "Error: El archivo del kernel compilado no se encontró."
+          exit 1
+        fi
+        
+    - name: Upload Artifact 📤
+      uses: actions/upload-artifact@v4
+      with:
+        name: Vayu-Kernel-${{ inputs.kernel_branch }}-${{ steps.version.outputs.commit }}
+        path: kernel/out/arch/arm64/boot/*.zip
