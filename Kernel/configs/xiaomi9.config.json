@@ -9,8 +9,9 @@
     },
     "toolchains": [
       {
-        "name": "aosp-clang",
-        "url": "https://github.com/AOSP-Clang/Main-Clang/releases/download/17.0.2-r498229b/17.0.2-r498229b.tar.gz",
+        "name": "proton-clang",
+        "repo": "https://github.com/kdrag0n/proton-clang",
+        "branch": "master",
         "binaryEnv": ["bin"]
       }
     ],
