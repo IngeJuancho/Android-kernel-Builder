@@ -1,7 +1,7 @@
 [
   {
     "kernelSource": {
-      "name": "TejasVayuKernel",
+      "name": "AnymoreKernel",
       "repo": "https://github.com/AnymoreProject/android_kernel_vayu",
       "branch": "16",
       "device": "vayu",
