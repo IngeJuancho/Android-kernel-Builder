@@ -5,7 +5,7 @@ on:
 
 jobs:
   Read-configuration:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22-04
     outputs:
       CONFIGS: ${{ steps.generate-matrix.outputs.CONFIGS }}
       BUILD_DATE: ${{ steps.generate-builddate.outputs.BUILDDATE }}
@@ -23,7 +23,7 @@ jobs:
 
   Build-Kernel:
     name: "🐎 Build kernel"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22-04
     needs:
       - Read-configuration
     strategy:
@@ -134,12 +134,18 @@ jobs:
           export KBUILD_BUILD_HOST=Github-Action
           export KBUILD_BUILD_USER=${{ github.actor }}
           
-          make ${{ env.ARGS }} ${{ env.KERNEL_DEFCONFIG_PATH }}
+          # 1. Copia el defconfig al directorio de salida como .config
+          cp ${{ env.KERNEL_DEFCONFIG_PATH }} ${{ env.OUT_DIR }}/.config
           
+          # 2. Procesa la configuración copiada
+          make ${{ env.ARGS }} olddefconfig
+          
+          # 3. Modifica el .config ya procesado
           sed -i 's/CONFIG_NR_CPUS=.*/CONFIG_NR_CPUS=8/g' ${{ env.OUT_DIR }}/.config
           
+          # 4. Compila el kernel
           make ${{ env.ARGS }} KBUILD_CFLAGS+="-Wno-error=implicit-function-declaration" dtbo.img vendor_boot.img vendor_dlkm.img
-
+          
       - name: 📦 Pack All Boot Files
         if: success()
         run: |
