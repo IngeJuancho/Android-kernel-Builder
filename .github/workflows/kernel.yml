@@ -177,7 +177,6 @@ jobs:
             cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/vendor_boot.img" ./AnyKernel3/
           fi
           
-          # ** NUEVO BLOQUE PARA COPIAR DTB **
           if [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/dtb" ]; then
             cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/dtb" ./AnyKernel3/
           fi
