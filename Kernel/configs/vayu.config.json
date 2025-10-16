@@ -2,8 +2,8 @@
   {
     "kernelSource": {
       "name": "TejasVayuKernel",
-      "repo": "https://github.com/tejas101k/kernel_xiaomi_vayu",
-      "branch": "sixteen",
+      "repo": "https://github.com/AnymoreProject/android_kernel_vayu",
+      "branch": "16",
       "device": "vayu",
       "defconfig": "vayu_user_defconfig"
     },
