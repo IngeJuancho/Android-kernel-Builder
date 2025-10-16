@@ -134,15 +134,12 @@ jobs:
           export KBUILD_BUILD_HOST=Github-Action
           export KBUILD_BUILD_USER=${{ github.actor }}
           
-          # Generar la configuración inicial
           make ${{ env.ARGS }} ${{ env.KERNEL_DEFCONFIG_PATH }}
           
-          # Forzar el valor de NR_CPUS a 8 para arreglar el error de compilación anterior
           sed -i 's/CONFIG_NR_CPUS=.*/CONFIG_NR_CPUS=8/g' ${{ env.OUT_DIR }}/.config
           
-          # Compilar el kernel con la configuración corregida y el nuevo flag
-          make ${{ env.ARGS }} KBUILD_CFLAGS+="-Wno-error=implicit-function-declaration"
-          
+          make ${{ env.ARGS }} KBUILD_CFLAGS+="-Wno-error=implicit-function-declaration" dtbo.img vendor_boot.img vendor_dlkm.img
+
       - name: 📦 Pack All Boot Files
         if: success()
         run: |
@@ -160,6 +157,7 @@ jobs:
           ANYKERNEL3_FILE: "${{ env.WORKSPACE }}/AnyKernel3-${{ env.KERNEL_NAME }}-${{ env.BUILD_DATE }}"
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
+          
           if [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz-dtb" ]; then
             cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz-dtb" ./AnyKernel3/
           elif [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/Image.gz" ]; then
@@ -170,6 +168,20 @@ jobs:
             echo "¡No se encontró la imagen del kernel compilado!"
             exit 1
           fi
+
+          if [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/dtbo.img" ]; then
+            cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/dtbo.img" ./AnyKernel3/
+          fi
+          
+          if [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/vendor_boot.img" ]; then
+            cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/vendor_boot.img" ./AnyKernel3/
+          fi
+          
+          # ** NUEVO BLOQUE PARA COPIAR DTB **
+          if [ -f "${{ env.OUT_DIR }}/arch/arm64/boot/dtb" ]; then
+            cp -f "${{ env.OUT_DIR }}/arch/arm64/boot/dtb" ./AnyKernel3/
+          fi
+          
           cd AnyKernel3/
           zip -r9 "${{ env.ANYKERNEL3_FILE }}.zip" ./*
       - name: "💾 Upload AnyKernel3 zip"
